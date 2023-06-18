@@ -2,30 +2,43 @@ import tkinter as tk
 from tkinter import messagebox
 from tkinter import Scrollbar
 import csv
+import pyttsx3
+
+
+engine = pyttsx3.init()
+
+
+def select_voice():
+    voice = voice_option.get()
+    if voice == "M":
+        voices = engine.getProperty('voices')
+        engine.setProperty('voice', voices[0].id)
+    elif voice == "F":
+        voices = engine.getProperty('voices')
+        engine.setProperty('voice', voices[1].id)
 
 
 def add_word():
-    """Adds a word entry to the dictionary.csv file."""
     word = word_entry.get()
     pos = pos_dropdown.get()
     definition = definition_entry.get()
     synonyms = synonyms_entry.get()
     antonyms = antonyms_entry.get()
 
-    if word and definition:
+    if word and definition and pos != "Select a part-of-speech":
         with open('dictionary.csv', 'a', newline='') as f:
             writer = csv.writer(f, delimiter=';')
             writer.writerow([word, pos, definition, synonyms, antonyms])
 
         messagebox.showinfo("Success", "Word added successfully.")
+        refresh_dropdown()
         refresh_listbox()
         clear_fields()
     else:
-        messagebox.showwarning("Missing Information", "Please enter a word and definition.")
+        messagebox.showwarning("Missing Information", "Please enter a word, part-of-speech and definition.")
 
 
 def load_word():
-    """Loads the information corresponding to the currently selected word into the listbox."""
     selected_word = word_dropdown.get()
     listbox.delete(0, tk.END)
     count = 1
@@ -43,7 +56,6 @@ def load_word():
 
 
 def delete_record():
-    """Deletes a selected record from the dictionary.csv file."""
     selected_word = word_entry.get().strip()
     selected_pos = pos_dropdown.get().strip()
     selected_definition = definition_entry.get().strip()
@@ -72,12 +84,12 @@ def delete_record():
         messagebox.showinfo("Success", "Record deleted successfully.")
         refresh_dropdown()
         refresh_listbox()
+        clear_fields()
     else:
         messagebox.showwarning("No Matching Record", "No record found with the provided information.")
 
 
 def clear_fields():
-    """Clears the input fields."""
     word_entry.delete(0, tk.END)
     definition_entry.delete(0, tk.END)
     synonyms_entry.delete(0, tk.END)
@@ -85,7 +97,6 @@ def clear_fields():
 
 
 def refresh_dropdown():
-    """Refreshes the word dropdown menu based on the dictionary CSV file."""
     word_dropdown.set("Select a word")
     word_menu['menu'].delete(0, 'end')
 
@@ -100,7 +111,6 @@ def refresh_dropdown():
 
 
 def refresh_listbox():
-    """Refreshes the listbox to display information for the selected word."""
     selected_word = word_dropdown.get()
     listbox.delete(0, tk.END)
 
@@ -116,18 +126,12 @@ def refresh_listbox():
 
 
 def load_record_by_index():
-    """Loads a record into the input fields based on the selected word and the index
-    (displayed in the listbox when the word is chosen)."""
     index = int(index_entry.get())
 
     word = word_dropdown.get().strip()
 
-    if not index:
-        messagebox.showerror("Index not detected", "Please enter a value into the index textbox.")
-        return
-
     if not word:
-        messagebox.showerror("Word not detected", "Please enter a word.")
+        messagebox.showerror("Empty Word", "Please enter a word.")
         return
 
     with open('dictionary.csv', 'r') as f:
@@ -161,6 +165,50 @@ def load_record_by_index():
     antonyms_entry.insert(0, antonyms)
 
 
+def edit_entry():
+    selected_word = word_entry.get().strip()
+    selected_pos = pos_dropdown.get().strip()
+    selected_definition = definition_entry.get().strip()
+
+    if not selected_word or not selected_pos or not selected_definition:
+        messagebox.showwarning("Incomplete Information", "Please provide the word, part of speech, and definition.")
+        return
+
+    with open('dictionary.csv', 'r') as f:
+        rdr = csv.reader(f, delimiter=';')
+        rows = list(rdr)
+
+    edited = False
+    with open('dictionary.csv', 'w', newline='') as f:
+        writer = csv.writer(f, delimiter=';')
+        for row in rows:
+            word = row[0].strip()
+            pos = row[1].strip()
+            definition = row[2].strip()
+            if word == selected_word and pos == selected_pos and definition == selected_definition:
+                edited = True
+                writer.writerow([selected_word,
+                                 selected_pos, selected_definition, synonyms_entry.get(), antonyms_entry.get()])
+            else:
+                writer.writerow(row)
+    if edited:
+        messagebox.showinfo("Success", "Record edited successfully.")
+        refresh_dropdown()
+        refresh_listbox()
+    else:
+        messagebox.showwarning("No Matching Record", "No record found with the provided information.")
+
+
+def pronounce_word():
+    selected_word = word_dropdown.get().strip()
+    if not selected_word or selected_word == "Select a word":
+        messagebox.showerror("Invalid Word", "Please select a valid word.")
+        return
+
+    engine.say(selected_word)
+    engine.runAndWait()
+
+
 window = tk.Tk()
 window.title("Dictionary")
 
@@ -178,9 +226,9 @@ definition_entry = tk.Entry(window)
 synonyms_entry = tk.Entry(window)
 antonyms_entry = tk.Entry(window)
 
-index_label = tk.Label(window, text="Record Index \n (matches listbox):")
+index_label = tk.Label(window, text="Record Index \n (in listbox):")
 index_entry = tk.Entry(window)
-index_button = tk.Button(window, text="Load Record", command=load_record_by_index)
+index_button = tk.Button(window, text="Load Record", command=load_record_by_index, bg="#d0d0d0")
 
 word_dropdown = tk.StringVar()
 word_menu = tk.OptionMenu(window, word_dropdown, "Select a word")
@@ -189,17 +237,20 @@ scrollbar = Scrollbar(window)
 
 listbox = tk.Listbox(window)
 
-add_button = tk.Button(window, text="Add Word", command=add_word)
-load_button = tk.Button(window, text="Load Into Listbox", command=load_word)
-delete_button = tk.Button(window, text="Delete Definition", command=delete_record)
+add_button = tk.Button(window, text="Add Word", command=add_word, bg="#2a4c29", fg="#f3f7d6")
+edit_button = tk.Button(window, text="Edit Entry", command=edit_entry, bg="#f2f7ca")
+load_button = tk.Button(window, text="Load Into Listbox", command=load_word, bg="#d0d0d0")
+delete_button = tk.Button(window, text="Delete Definition", command=delete_record, bg="#731d1d", fg="#f3f7d6")
+pronounce_button = tk.Button(window, text="Pronounce Word", command=pronounce_word, bg="#b2c9f2")
+
+voice_option = tk.StringVar()
+male_radio = tk.Radiobutton(window, text="M", variable=voice_option, value="M", command=select_voice)
+female_radio = tk.Radiobutton(window, text="F", variable=voice_option, value="F", command=select_voice)
+voice_option.set("M")
 
 window.grid_columnconfigure(0, weight=1)
 window.grid_columnconfigure(1, weight=1)
 window.grid_columnconfigure(2, weight=1)
-
-window.grid_columnconfigure(0, weight=1)
-window.grid_columnconfigure(1, weight=1)
-window.grid_columnconfigure(2, weight=2)
 
 word_entry.config(width=20)
 definition_entry.config(width=20)
@@ -207,6 +258,7 @@ synonyms_entry.config(width=20)
 antonyms_entry.config(width=20)
 
 listbox.config(width=40)
+index_entry.config(width=5)
 
 word_label.grid(row=0, column=0, sticky=tk.E)
 word_entry.grid(row=0, column=1, sticky=tk.W)
@@ -219,14 +271,18 @@ synonyms_entry.grid(row=3, column=1, sticky=tk.W)
 antonyms_label.grid(row=4, column=0, sticky=tk.E)
 antonyms_entry.grid(row=4, column=1, sticky=tk.W)
 word_menu.grid(row=1, column=2)
-listbox.grid(row=2, column=2, rowspan=4, padx=10, pady=10)
-scrollbar.grid(row=2, column=3, rowspan=4, sticky=tk.N + tk.S)
-add_button.grid(row=5, column=0)
-load_button.grid(row=0, column=2)
-delete_button.grid(row=5, column=1)
-index_label.grid(row=6, column=0, sticky=tk.E)
-index_entry.grid(row=6, column=1, sticky=tk.W)
-index_button.grid(row=7, column=1)
+load_button.grid(row=2, column=2, pady=5)
+pronounce_button.grid(row=0, column=2, sticky=tk.N, pady=5)
+listbox.grid(row=3, column=2, rowspan=4, padx=10, pady=10)
+scrollbar.grid(row=3, column=3, rowspan=4, sticky=tk.N + tk.S)
+add_button.grid(row=5, column=1, sticky=tk.N + tk.W)
+edit_button.grid(row=6, column=1, sticky=tk.N + tk.W)
+delete_button.grid(row=7, column=1, sticky=tk.N + tk.W)
+index_label.grid(row=8, column=2, sticky=tk.W)
+index_entry.grid(row=8, column=2)
+index_button.grid(row=9, column=2, pady=5)
+male_radio.grid(row=0, column=4, sticky=tk.W)
+female_radio.grid(row=1, column=4, sticky=tk.W)
 
 listbox.config(yscrollcommand=scrollbar.set)
 scrollbar.config(command=listbox.yview)
