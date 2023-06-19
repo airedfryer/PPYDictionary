@@ -4,11 +4,17 @@ from tkinter import Scrollbar
 import csv
 import pyttsx3
 
-
 engine = pyttsx3.init()
 
 
 def select_voice():
+    """
+    Selects the voice for pronunciation based on the chosen option.
+
+    Retrieves the selected voice option from the `voice_option` variable and sets the corresponding
+    voice in the text-to-speech engine (`engine`). If "M" is selected, the first/masculine voice in the available
+    voices list is used. If "F" is selected, the second/feminine voice is used.
+    """
     voice = voice_option.get()
     if voice == "M":
         voices = engine.getProperty('voices')
@@ -18,14 +24,46 @@ def select_voice():
         engine.setProperty('voice', voices[1].id)
 
 
+def pronounce_word():
+    """
+    Pronounces the selected word using the pyttsx3 TTS engine.
+
+    Retrieves the selected word from the `word_dropdown` variable and checks if it is a valid word.
+    If the word is valid, it is passed to the text-to-speech engine (`engine`) for pronunciation.
+    """
+    selected_word = word_dropdown.get().strip()
+    if not selected_word or selected_word == "Select a word":
+        messagebox.showerror("Invalid Word", "Please select a valid word.")
+        return
+
+    engine.say(selected_word)
+    engine.runAndWait()
+
+
 def add_word():
-    word = word_entry.get()
+    """
+    Adds a new word entry to the dictionary.
+
+    This function retrieves the values entered in the word, part-of-speech, definition, synonyms, and antonyms
+    fields. It performs validation to ensure that all required fields (word, p-o-s, definition) are filled.
+    If the word entry is unique (not already existing in the dictionary), it appends the word and its details
+    to the CSV file. Finally, it displays a success message, refreshes the word dropdown and listbox,
+    and clears the input fields.
+    """
+    word = word_entry.get().strip()
     pos = pos_dropdown.get()
-    definition = definition_entry.get()
-    synonyms = synonyms_entry.get()
-    antonyms = antonyms_entry.get()
+    definition = definition_entry.get().strip()
+    synonyms = synonyms_entry.get().strip()
+    antonyms = antonyms_entry.get().strip()
 
     if word and definition and pos != "Select a part-of-speech":
+        with open('dictionary.csv', 'r') as f:
+            rdr = csv.reader(f, delimiter=';')
+            for row in rdr:
+                if row[0].strip() == word and row[1].strip() == pos and row[2].strip() == definition:
+                    messagebox.showwarning("Duplicate Entry", "The entry already exists.")
+                    return
+
         with open('dictionary.csv', 'a', newline='') as f:
             writer = csv.writer(f, delimiter=';')
             writer.writerow([word, pos, definition, synonyms, antonyms])
@@ -35,10 +73,17 @@ def add_word():
         refresh_listbox()
         clear_fields()
     else:
-        messagebox.showwarning("Missing Information", "Please enter a word, part-of-speech and definition.")
+        messagebox.showwarning("Missing Information", "Please enter a word, part-of-speech, and definition.")
 
 
 def load_word():
+    """
+    Loads the details of a word from the dictionary file.
+
+    Retrieves a word form the dropdown and searches for its details in the dictionary file. If the word is found,
+    it retrieves the associated part-of-speech, definition, synonyms, and antonyms. The function then populates
+    the listbox with the retrieved information.
+    """
     selected_word = word_dropdown.get()
     listbox.delete(0, tk.END)
     count = 1
@@ -56,6 +101,13 @@ def load_word():
 
 
 def delete_record():
+    """
+    Deletes a word record from the dictionary file.
+
+    Retrieves word, part-of-speech and definition from the entry box and deletes the corresponding word record
+    from the dictionary file. The function removes the record from the file, refreshes the UI listbox, and displays
+    a success message. It requires the user to load in the word instead of using the index as a security measure.
+    """
     selected_word = word_entry.get().strip()
     selected_pos = pos_dropdown.get().strip()
     selected_definition = definition_entry.get().strip()
@@ -90,6 +142,10 @@ def delete_record():
 
 
 def clear_fields():
+    """
+    Clears the input fields for word, part-of-speech, definition, synonyms, and antonyms,
+    resetting them to their default (empty) state.
+    """
     word_entry.delete(0, tk.END)
     definition_entry.delete(0, tk.END)
     synonyms_entry.delete(0, tk.END)
@@ -97,6 +153,12 @@ def clear_fields():
 
 
 def refresh_dropdown():
+    """
+    Refreshes the word dropdown with the updated list of words from the dictionary.
+
+    Retrieves the list of words from the CSV file and populates the word dropdown (`word_dropdown`) with the
+    updated set of unique words. It also sets the default selected option to "Select a word".
+    """
     word_dropdown.set("Select a word")
     word_menu['menu'].delete(0, 'end')
 
@@ -111,6 +173,13 @@ def refresh_dropdown():
 
 
 def refresh_listbox():
+    """
+    Refreshes the word listbox with the updated list of words from the dictionary.
+
+    Retrieves the list of words from the CSV file and populates the word listbox
+    (`word_listbox`) with the updated list of words. It also configures the listbox to display the
+    word entries in a scrollable manner.
+    """
     selected_word = word_dropdown.get()
     listbox.delete(0, tk.END)
 
@@ -126,6 +195,16 @@ def refresh_listbox():
 
 
 def load_record_by_index():
+    """
+    Loads a word record from the dictionary based on the provided index.
+
+    Retrieves the word record at the specified index from the CSV file and updates the fields
+    (word_entry, pos_dropdown, definition_entry, synonyms_entry, and antonyms_entry) with the loaded information.
+    The record number can be found by examining the word values when loaded into the listbox.
+    The first record has a value of 1, not 0.
+    If the index is out of range or the CSV file cannot be read, an error message is displayed.
+    If the index is valid, but the record is not found, the fields are cleared.
+    """
     index = int(index_entry.get())
 
     word = word_dropdown.get().strip()
@@ -166,47 +245,49 @@ def load_record_by_index():
 
 
 def edit_entry():
-    selected_word = word_entry.get().strip()
-    selected_pos = pos_dropdown.get().strip()
-    selected_definition = definition_entry.get().strip()
+    """
+    Updates the details of a selected word in the dictionary.
 
-    if not selected_word or not selected_pos or not selected_definition:
-        messagebox.showwarning("Incomplete Information", "Please provide the word, part of speech, and definition.")
+    This function retrieves the selected word from the word listbox (`word_listbox`) and the updated details
+    (part-of-speech, definition, synonyms, antonyms) entered in the update word form (`pos_entry`, `definition_entry`,
+    `synonyms_entry`, `antonyms_entry`). It modifies the corresponding entry in the CSV file with the updated details,
+    refreshes the word dropdown and listbox, and displays a success message.
+    """
+    index = int(index_entry.get())
+
+    word = word_dropdown.get().strip()
+
+    if not word or word == "Select a word":
+        messagebox.showerror("Empty Word", "Please enter a word.")
         return
 
     with open('dictionary.csv', 'r') as f:
         rdr = csv.reader(f, delimiter=';')
+        count = 0
         rows = list(rdr)
 
     edited = False
     with open('dictionary.csv', 'w', newline='') as f:
         writer = csv.writer(f, delimiter=';')
         for row in rows:
-            word = row[0].strip()
-            pos = row[1].strip()
-            definition = row[2].strip()
-            if word == selected_word and pos == selected_pos and definition == selected_definition:
-                edited = True
-                writer.writerow([selected_word,
-                                 selected_pos, selected_definition, synonyms_entry.get(), antonyms_entry.get()])
+            if row[0].strip() == word:
+                count += 1
+                if count == index:
+                    edited = True
+                    writer.writerow([word_entry.get(),
+                                     pos_dropdown.get(), definition_entry.get(),
+                                     synonyms_entry.get(), antonyms_entry.get()])
+                else:
+                    writer.writerow(row)
             else:
                 writer.writerow(row)
+
     if edited:
         messagebox.showinfo("Success", "Record edited successfully.")
         refresh_dropdown()
         refresh_listbox()
     else:
         messagebox.showwarning("No Matching Record", "No record found with the provided information.")
-
-
-def pronounce_word():
-    selected_word = word_dropdown.get().strip()
-    if not selected_word or selected_word == "Select a word":
-        messagebox.showerror("Invalid Word", "Please select a valid word.")
-        return
-
-    engine.say(selected_word)
-    engine.runAndWait()
 
 
 window = tk.Tk()
